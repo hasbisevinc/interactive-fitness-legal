@@ -6,6 +6,7 @@
   The WebRTC handshake goes over the Cast message channel below (no other server), and this page
   stays loaded for the whole session so the Cast framework keeps the app alive.
 
+  Picture and sound come as two separate WebRTC streams ("game", "game-audio").
   Phone -> TV: {"type":"offer","sdp":"..."}   (complete SDP, no trickle ICE)
   TV -> phone: {"type":"answer","sdp":"..."}
   Must match ios/websocket/Cast/CastController.swift and GameStreamer.swift.
@@ -26,7 +27,8 @@
 </style>
 </head>
 <body>
-<video id="video" autoplay playsinline></video>
+<video id="video" autoplay muted playsinline></video>
+<audio id="audio" autoplay></audio>
 <div id="splash">
   <div class="brand" id="brand">INTERACTIVE FITNESS</div>
   <div id="status"></div>
@@ -39,6 +41,7 @@
     : { brand: "INTERACTIVE FITNESS", connecting: "Connecting to your phone…", lost: "Connection lost…" };
 
   const video = document.getElementById("video");
+  const audio = document.getElementById("audio");
   const splash = document.getElementById("splash");
   const status = document.getElementById("status");
   document.getElementById("brand").textContent = TEXT.brand;
@@ -63,13 +66,20 @@
     const pc = new RTCPeerConnection({ iceServers: [] });
     peer = pc;
     pc.ontrack = e => {
+      const stream = e.streams[0] || new MediaStream([e.track]);
+      if (e.track.kind === "audio") {
+        // The game's sound: its own stream (not synced to the picture, which would hold the
+        // picture back) with a small buffer so it plays smoothly.
+        try { e.receiver.jitterBufferTarget = 60; } catch (_) {}
+        audio.srcObject = stream;
+        audio.play().catch(() => {});
+        return;
+      }
       // Show frames as soon as they arrive: latency matters more than smoothness for a motion game.
       try { e.receiver.playoutDelayHint = 0; } catch (_) {}
       try { e.receiver.jitterBufferTarget = 0; } catch (_) {}
-      // Picture and game sound arrive as one stream (two tracks).
-      if (video.srcObject !== e.streams[0]) video.srcObject = e.streams[0] || new MediaStream([e.track]);
-      video.muted = false;
-      video.play().catch(() => { video.muted = true; video.play().catch(() => {}); });
+      video.srcObject = stream;
+      video.play().catch(() => {});
       hideSplash();
     };
     pc.onconnectionstatechange = () => {
