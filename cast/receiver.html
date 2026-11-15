@@ -69,8 +69,8 @@
       const stream = e.streams[0] || new MediaStream([e.track]);
       if (e.track.kind === "audio") {
         // The game's sound: its own stream (not synced to the picture, which would hold the
-        // picture back) with a small buffer so it plays smoothly.
-        try { e.receiver.jitterBufferTarget = 60; } catch (_) {}
+        // picture back) with a small buffer (the phone already smooths it out).
+        try { e.receiver.jitterBufferTarget = 20; } catch (_) {}
         audio.srcObject = stream;
         audio.play().catch(() => {});
         return;
