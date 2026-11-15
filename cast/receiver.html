@@ -1,11 +1,13 @@
 <!doctype html>
 <!--
-  Interactive Fitness Chromecast receiver (Google Cast Custom Receiver).
-  The game runs on the phone; the phone serves a page on the home network (port 8090) that plays
-  the game picture over WebRTC. This receiver only waits for the phone to send that page's address
-  on the custom namespace below, then opens it. It accepts only plain-HTTP addresses on private
-  (home network) IPs, so it can't be pointed at anything on the internet.
-  Message: {"url": "http://192.168.1.20:8090/"}
+  Interactive Fitness Chromecast receiver (Google Cast Custom Receiver 97FB2AE8).
+  The game runs on the phone and is streamed to this page over WebRTC on the home network.
+  The WebRTC handshake goes over the Cast message channel below (no other server), and this page
+  stays loaded for the whole session so the Cast framework keeps the app alive.
+
+  Phone -> TV: {"type":"offer","sdp":"..."}   (complete SDP, no trickle ICE)
+  TV -> phone: {"type":"answer","sdp":"..."}
+  Must match ios/websocket/Cast/CastController.swift and GameStreamer.swift.
 -->
 <html lang="en">
 <head>
@@ -13,48 +15,82 @@
 <title>Interactive Fitness</title>
 <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
 <style>
-  html, body { margin: 0; height: 100%; background: #0e0f11; color: #eceef2;
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden;
     font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
-  body { display: flex; align-items: center; justify-content: center; text-align: center; }
+  video { position: fixed; inset: 0; width: 100vw; height: 100vh; object-fit: contain; background: #000; }
+  #splash { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; background: #0e0f11; color: #eceef2; text-align: center; }
   .brand { font-weight: 800; letter-spacing: .14em; font-size: 28px; color: #ff6b2c; }
-  .hint { margin-top: 18px; font-size: 22px; color: #a2a7b3; }
+  #status { margin-top: 18px; font-size: 22px; color: #a2a7b3; }
 </style>
 </head>
 <body>
-<div>
-  <div class="brand">INTERACTIVE FITNESS</div>
-  <div class="hint" id="hint">Connecting to your phone…</div>
+<video id="video" autoplay muted playsinline></video>
+<div id="splash">
+  <div class="brand" id="brand">INTERACTIVE FITNESS</div>
+  <div id="status"></div>
 </div>
 <script>
   const NAMESPACE = "urn:x-cast:com.hasbis.interactive.fitness";
+  const tr = (navigator.language || "").toLowerCase().startsWith("tr");
+  const TEXT = tr
+    ? { brand: "İNTERAKTİF FİTNESS", connecting: "Telefona bağlanıyor…", lost: "Bağlantı koptu…" }
+    : { brand: "INTERACTIVE FITNESS", connecting: "Connecting to your phone…", lost: "Connection lost…" };
 
-  // http://<private IPv4>:<port>/... only (10.x, 172.16-31.x, 192.168.x, 169.254.x).
-  function isHomeNetworkPage(url) {
-    try {
-      const u = new URL(url);
-      if (u.protocol !== "http:") return false;
-      const p = u.hostname.split(".").map(Number);
-      if (p.length !== 4 || p.some(n => !Number.isInteger(n) || n < 0 || n > 255)) return false;
-      return p[0] === 10 || (p[0] === 172 && p[1] >= 16 && p[1] <= 31) ||
-             (p[0] === 192 && p[1] === 168) || (p[0] === 169 && p[1] === 254);
-    } catch (e) {
-      return false;
-    }
+  const video = document.getElementById("video");
+  const splash = document.getElementById("splash");
+  const status = document.getElementById("status");
+  document.getElementById("brand").textContent = TEXT.brand;
+  status.textContent = TEXT.connecting;
+  let peer = null;
+
+  function showSplash(text) { status.textContent = text; splash.style.display = "flex"; }
+  function hideSplash() { splash.style.display = "none"; }
+
+  function gathered(pc) {
+    return new Promise(resolve => {
+      if (pc.iceGatheringState === "complete") return resolve();
+      const timer = setTimeout(resolve, 1500);
+      pc.addEventListener("icegatheringstatechange", () => {
+        if (pc.iceGatheringState === "complete") { clearTimeout(timer); resolve(); }
+      });
+    });
+  }
+
+  async function answerOffer(sdp, senderId) {
+    if (peer) peer.close();
+    const pc = new RTCPeerConnection({ iceServers: [] });
+    peer = pc;
+    pc.ontrack = e => {
+      // Show frames as soon as they arrive: latency matters more than smoothness for a motion game.
+      try { e.receiver.playoutDelayHint = 0; } catch (_) {}
+      try { e.receiver.jitterBufferTarget = 0; } catch (_) {}
+      video.srcObject = e.streams[0] || new MediaStream([e.track]);
+      video.play().catch(() => {});
+      hideSplash();
+    };
+    pc.onconnectionstatechange = () => {
+      if (pc === peer && (pc.connectionState === "failed" || pc.connectionState === "disconnected")) {
+        showSplash(TEXT.lost);
+      }
+    };
+    await pc.setRemoteDescription({ type: "offer", sdp });
+    await pc.setLocalDescription(await pc.createAnswer());
+    await gathered(pc);
+    context.sendCustomMessage(NAMESPACE, senderId, { type: "answer", sdp: pc.localDescription.sdp });
   }
 
   const context = cast.framework.CastReceiverContext.getInstance();
   context.addCustomMessageListener(NAMESPACE, event => {
     const data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
-    const url = data && data.url;
-    if (typeof url === "string" && isHomeNetworkPage(url)) {
-      // Replace this page: an HTTPS page can't frame the phone's plain-HTTP page.
-      location.replace(url);
+    if (data && data.type === "offer" && typeof data.sdp === "string") {
+      answerOffer(data.sdp, event.senderId).catch(err => console.error("answer failed", err));
     }
   });
-
   const options = new cast.framework.CastReceiverOptions();
   options.customNamespaces = { [NAMESPACE]: cast.framework.system.MessageType.JSON };
   options.disableIdleTimeout = true;
+  options.skipPlayersLoad = true; // no media player: the page shows a WebRTC stream itself
   context.start(options);
 </script>
 </body>
