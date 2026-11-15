@@ -1,0 +1,61 @@
+<!doctype html>
+<!--
+  Interactive Fitness Chromecast receiver (Google Cast Custom Receiver).
+  The game runs on the phone; the phone serves a page on the home network (port 8090) that plays
+  the game picture over WebRTC. This receiver only waits for the phone to send that page's address
+  on the custom namespace below, then opens it. It accepts only plain-HTTP addresses on private
+  (home network) IPs, so it can't be pointed at anything on the internet.
+  Message: {"url": "http://192.168.1.20:8090/"}
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Interactive Fitness</title>
+<script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+<style>
+  html, body { margin: 0; height: 100%; background: #0e0f11; color: #eceef2;
+    font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+  body { display: flex; align-items: center; justify-content: center; text-align: center; }
+  .brand { font-weight: 800; letter-spacing: .14em; font-size: 28px; color: #ff6b2c; }
+  .hint { margin-top: 18px; font-size: 22px; color: #a2a7b3; }
+</style>
+</head>
+<body>
+<div>
+  <div class="brand">INTERACTIVE FITNESS</div>
+  <div class="hint" id="hint">Connecting to your phone…</div>
+</div>
+<script>
+  const NAMESPACE = "urn:x-cast:com.hasbis.interactive.fitness";
+
+  // http://<private IPv4>:<port>/... only (10.x, 172.16-31.x, 192.168.x, 169.254.x).
+  function isHomeNetworkPage(url) {
+    try {
+      const u = new URL(url);
+      if (u.protocol !== "http:") return false;
+      const p = u.hostname.split(".").map(Number);
+      if (p.length !== 4 || p.some(n => !Number.isInteger(n) || n < 0 || n > 255)) return false;
+      return p[0] === 10 || (p[0] === 172 && p[1] >= 16 && p[1] <= 31) ||
+             (p[0] === 192 && p[1] === 168) || (p[0] === 169 && p[1] === 254);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  const context = cast.framework.CastReceiverContext.getInstance();
+  context.addCustomMessageListener(NAMESPACE, event => {
+    const data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+    const url = data && data.url;
+    if (typeof url === "string" && isHomeNetworkPage(url)) {
+      // Replace this page: an HTTPS page can't frame the phone's plain-HTTP page.
+      location.replace(url);
+    }
+  });
+
+  const options = new cast.framework.CastReceiverOptions();
+  options.customNamespaces = { [NAMESPACE]: cast.framework.system.MessageType.JSON };
+  options.disableIdleTimeout = true;
+  context.start(options);
+</script>
+</body>
+</html>
