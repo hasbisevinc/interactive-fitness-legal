@@ -1,7 +1,8 @@
 <!doctype html>
 <!--
   Interactive Fitness Chromecast receiver (Google Cast Custom Receiver 97FB2AE8).
-  The game runs on the phone and is streamed to this page over WebRTC on the home network.
+  The game runs on the phone and is streamed to this page over WebRTC on the home network:
+  the picture and the game's sound (the phone is silent while casting).
   The WebRTC handshake goes over the Cast message channel below (no other server), and this page
   stays loaded for the whole session so the Cast framework keeps the app alive.
 
@@ -25,7 +26,7 @@
 </style>
 </head>
 <body>
-<video id="video" autoplay muted playsinline></video>
+<video id="video" autoplay playsinline></video>
 <div id="splash">
   <div class="brand" id="brand">INTERACTIVE FITNESS</div>
   <div id="status"></div>
@@ -65,8 +66,10 @@
       // Show frames as soon as they arrive: latency matters more than smoothness for a motion game.
       try { e.receiver.playoutDelayHint = 0; } catch (_) {}
       try { e.receiver.jitterBufferTarget = 0; } catch (_) {}
-      video.srcObject = e.streams[0] || new MediaStream([e.track]);
-      video.play().catch(() => {});
+      // Picture and game sound arrive as one stream (two tracks).
+      if (video.srcObject !== e.streams[0]) video.srcObject = e.streams[0] || new MediaStream([e.track]);
+      video.muted = false;
+      video.play().catch(() => { video.muted = true; video.play().catch(() => {}); });
       hideSplash();
     };
     pc.onconnectionstatechange = () => {
