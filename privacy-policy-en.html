@@ -70,7 +70,7 @@
 <header>
   <div class="brand">Interactive Fitness</div>
   <h1>Privacy Policy</h1>
-  <p class="meta">Effective and last updated: 14 November 2026 · Version 1.0</p>
+  <p class="meta">Effective and last updated: 21 November 2026 · Version 1.1</p>
   <nav class="lang" aria-label="Language"><a href="privacy-policy-tr.html" hreflang="tr" lang="tr">Türkçe</a><span>English</span></nav>
 </header>
 
@@ -119,6 +119,7 @@
   <li>Images and movement data are processed <strong>only in the moment</strong>, in your device’s memory. <strong>No image, video, photo or body measurement is stored or leaves your device</strong>, whether to us, to Google or to anyone else.</li>
   <li>This is not used to recognise or identify you. There is no face recognition and no biometric template is created, so no special-category (biometric) data is processed.</li>
   <li>When you mirror the game to a TV, what is sent to the TV is the game’s picture, not your camera image (see section 5).</li>
+  <li><strong>TV delay measurement:</strong> if you start it (or accept it when the app offers it because the TV looks late), you point the phone’s <strong>rear camera</strong> at the TV. The app only looks for when a marker shown in the game appears on the TV screen, to measure the delay. This image, too, is processed only in memory at that moment; it is not stored or sent anywhere.</li>
   <li>iOS asks for camera permission. You can turn it off at any time in the iPhone Settings app; the games then can’t detect your movements.</li>
 </ul>
 
@@ -127,6 +128,7 @@
 <ul>
   <li><strong>Run history:</strong> for each finished game, the date and time, which game, score, stars, estimated calories, duration, obstacle/wall counts, number of jumps, crouches and lane changes, and whether it was played on the phone or a TV.</li>
   <li><strong>Settings and preferences:</strong> music and sound effects, the crouch-obstacle preference, reminder on/off and time, the game last shown on the home screen, figure visibility in Stretch, in-game settings.</li>
+  <li><strong>TV settings:</strong> for each TV you used the game on with settings of its own (Settings ▸ TV settings): the TV’s name (the AirPlay receiver’s or Chromecast’s name), where the game’s sound plays (TV, phone or off), the resolution and graphics choices, the last measured delay and when it was measured. The app also remembers the names of TVs for which it has already offered the delay measurement, so it does not offer it again.</li>
   <li><strong>Consent records:</strong> that the introduction was shown, the version of the health notice you accepted, and your answer to the usage-data question.</li>
 </ul>
 <p>Calorie values are rough estimates based only on play time and movement counts. They are not medical or health data.</p>
@@ -137,7 +139,7 @@
 <p>If you consent, Google’s Firebase services are used:</p>
 <h3>Google Analytics for Firebase</h3>
 <ul>
-  <li><strong>Usage events:</strong> screens opened; games started, paused and finished; score, stars, estimated calories, duration and movement counts; phone or TV play; TV search and connection results; camera, local network and notification permission results; settings changes (sound, music, crouch obstacles, reminder and its time); when a feature suggestion is sent, only its length (never its text); data erasure.</li>
+  <li><strong>Usage events:</strong> screens opened; games started, paused and finished; score, stars, estimated calories, duration and movement counts; phone or TV play; TV search and connection results; TV delay measurement (started, offered by the app, the delays measured in each step, the result and the settings applied) and TV settings changes (sound, resolution, graphics), without the TV’s name; stream performance numbers on a TV (picture and sound delay, encoding time, dropped frames, freezes); camera, local network and notification permission results; settings changes (sound, music, crouch obstacles, reminder and its time); when a feature suggestion is sent, only its length (never its text); data erasure.</li>
   <li><strong>Technical data:</strong> a randomly generated app instance ID, device model, iOS version, app version, language, screen resolution, first-open and session times. Google may derive an approximate location (country/city) from your IP address; Google Analytics does not store IP addresses.</li>
   <li>The advertising identifier (IDFA) is not collected, there is no cross-app tracking, and the data is not used for advertising. The analytics ID is not linked to your name or email.</li>
 </ul>
@@ -149,11 +151,11 @@
 
 <h2 id="s5">5. Playing on a TV</h2>
 <ul>
-  <li><strong>Local network:</strong> to find your TV, the app looks for AirPlay and Chromecast devices on your Wi‑Fi (Bonjour and Google Cast discovery). iOS asks for “Local Network” permission for this. Found device names are only shown on your screen; they are not stored or sent.</li>
+  <li><strong>Local network:</strong> to find your TV, the app looks for AirPlay and Chromecast devices on your Wi‑Fi (Bonjour and Google Cast discovery). iOS asks for “Local Network” permission for this. Found device names are shown on your screen and are never sent. If a TV gets settings of its own (section 3), its name is stored on your device with them.</li>
   <li><strong>AirPlay:</strong> mirroring uses Apple’s iOS feature and is subject to Apple’s privacy policy. The app sends none of your data during it.</li>
-  <li><strong>Chromecast:</strong> the game’s picture and sound are streamed from your phone to your TV <strong>only within your own local network</strong>, over an encrypted (WebRTC) connection. They are not sent over the internet or to us. Your camera image is never streamed.</li>
+  <li><strong>Chromecast:</strong> the game’s picture and sound are streamed from your phone to your TV <strong>only within your own local network</strong>, over an encrypted (WebRTC) connection. They are not sent over the internet or to us. Your camera image is never streamed. To measure the delay, the receiver page on your Chromecast sends stream statistics (such as delay and dropped frames) back to your phone over the same local connection.</li>
   <li><strong>Google Cast SDK:</strong> Chromecast support uses Google’s Cast software kit, which starts only when you search for a TV or connect to a Chromecast. Once started, Google may collect diagnostic and performance data, a device identifier, approximate location and Cast usage data to monitor and improve the reliability of the service. Your Chromecast loads the receiver app through Google’s Cast infrastructure. Google LLC processes this data under its own privacy policy: <a href="https://policies.google.com/privacy">policies.google.com/privacy</a>.</li>
-  <li>The app never uses your microphone. iOS requires the microphone permission text only because of the WebRTC library used for streaming.</li>
+  <li>The app never uses your microphone. iOS requires the microphone permission text only because of the WebRTC library used for streaming. When the game’s sound is set to play on the phone while the picture is on a TV, iOS’s “play and record” audio mode is used only to keep the sound on the phone; the microphone is not opened.</li>
 </ul>
 
 <h2 id="s6">6. Feature suggestion form</h2>
@@ -171,8 +173,8 @@
 <table>
   <thead><tr><th>Data</th><th>Purpose</th><th>Legal basis (KVKK / GDPR)</th></tr></thead>
   <tbody>
-    <tr><td>Live camera image, body joint points</td><td>Letting you control the game with your body</td><td>Necessary to provide the app (KVKK art. 5/2-c; GDPR art. 6/1-b). Never leaves the device and is never stored.</td></tr>
-    <tr><td>Run history, settings, consent records</td><td>Showing your history and running the app as you set it</td><td>Necessary to provide the app (KVKK 5/2-c; GDPR 6/1-b). Kept on the device only.</td></tr>
+    <tr><td>Live camera image, body joint points; rear camera image during TV delay measurement</td><td>Letting you control the game with your body; measuring the TV’s delay</td><td>Necessary to provide the app (KVKK art. 5/2-c; GDPR art. 6/1-b). Never leaves the device and is never stored.</td></tr>
+    <tr><td>Run history, settings, TV settings, consent records</td><td>Showing your history and running the app as you set it</td><td>Necessary to provide the app (KVKK 5/2-c; GDPR 6/1-b). Kept on the device only.</td></tr>
     <tr><td>Usage events, app instance ID, device/technical data</td><td>Understanding how the app is used and improving the games</td><td>Your explicit consent (KVKK 5/1 and art. 9 for the transfer abroad; GDPR 6/1-a)</td></tr>
     <tr><td>Crash reports</td><td>Finding and fixing bugs, keeping the app reliable</td><td>Your explicit consent (KVKK 5/1 and art. 9; GDPR 6/1-a)</td></tr>
     <tr><td>Google Cast diagnostic data</td><td>Providing Chromecast mirroring</td><td>Necessary to provide the feature you use (KVKK 5/2-c; occasional transfer abroad under KVKK 9/6-b; GDPR 6/1-b)</td></tr>
