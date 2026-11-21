@@ -9,6 +9,8 @@
   Picture and sound come as two separate WebRTC streams ("game", "game-audio").
   Phone -> TV: {"type":"offer","sdp":"..."}   (complete SDP, no trickle ICE)
   TV -> phone: {"type":"answer","sdp":"..."}
+  TV -> phone: {"type":"stats", ...} every 2 s while the picture plays: how long the stream takes on
+               this side (network, jitter buffer, decode, frame receive -> screen), see sendStats.
   Must match ios/websocket/Cast/CastController.swift and GameStreamer.swift.
 -->
 <html lang="en">
@@ -47,6 +49,10 @@
   document.getElementById("brand").textContent = TEXT.brand;
   status.textContent = TEXT.connecting;
   let peer = null;
+  let sender = null;       // the phone's Cast sender id (stats go back to it)
+  let lastStats = null;    // the previous getStats totals: the stats sent are for the last 2 s
+  let frameTimes = [];     // receive -> expected display (ms) per frame, from requestVideoFrameCallback
+  let frameProcessing = []; // decode etc. per frame (ms), when the browser reports it
 
   function showSplash(text) { status.textContent = text; splash.style.display = "flex"; }
   function hideSplash() { splash.style.display = "none"; }
@@ -81,6 +87,7 @@
       video.srcObject = stream;
       video.play().catch(() => {});
       hideSplash();
+      watchFrames();
     };
     pc.onconnectionstatechange = () => {
       if (pc === peer && (pc.connectionState === "failed" || pc.connectionState === "disconnected")) {
@@ -90,8 +97,82 @@
     await pc.setRemoteDescription({ type: "offer", sdp });
     await pc.setLocalDescription(await pc.createAnswer());
     await gathered(pc);
+    sender = senderId;
+    lastStats = null;
     context.sendCustomMessage(NAMESPACE, senderId, { type: "answer", sdp: pc.localDescription.sdp });
   }
+
+  // ── Stream delay on the TV side ──
+  // Per frame: from its last packet arriving to when it is expected on screen (jitter buffer,
+  // decode, compositing). Not every receiver has requestVideoFrameCallback; then getStats alone.
+  let watchingFrames = false;
+  function watchFrames() {
+    if (watchingFrames || !("requestVideoFrameCallback" in HTMLVideoElement.prototype)) return;
+    watchingFrames = true;
+    const onFrame = (now, meta) => {
+      if (meta.receiveTime > 0 && meta.expectedDisplayTime > 0) {
+        const ms = meta.expectedDisplayTime - meta.receiveTime;
+        if (ms >= 0 && ms < 5000) frameTimes.push(ms);
+      }
+      if (meta.processingDuration > 0) frameProcessing.push(meta.processingDuration * 1000);
+      if (frameTimes.length > 600) frameTimes.splice(0, frameTimes.length - 600);
+      if (frameProcessing.length > 600) frameProcessing.splice(0, frameProcessing.length - 600);
+      video.requestVideoFrameCallback(onFrame);
+    };
+    video.requestVideoFrameCallback(onFrame);
+  }
+
+  const average = list => list.length ? list.reduce((a, b) => a + b, 0) / list.length : null;
+  const round = value => value == null || !isFinite(value) ? null : Math.round(value * 10) / 10;
+
+  // Every 2 s: what the last 2 s cost on this side, in ms (null = not reported by this receiver).
+  //   rttMs       network round trip (one way is about half)
+  //   jitterMs    average time a frame waited in the jitter buffer
+  //   decodeMs    average decode time per frame
+  //   processingMs first packet in -> decoded, per frame (jitter buffer + decode)
+  //   displayMs   last packet in -> expected on screen, per frame (requestVideoFrameCallback)
+  //   fps, dropped, freezes, width, height
+  async function sendStats() {
+    const pc = peer;
+    if (!pc || !sender || pc.connectionState !== "connected") return;
+    let report;
+    try { report = await pc.getStats(); } catch (_) { return; }
+    let inbound = null, pair = null;
+    report.forEach(stat => {
+      if (stat.type === "inbound-rtp" && stat.kind === "video") inbound = stat;
+      if (stat.type === "candidate-pair" && stat.nominated && stat.state === "succeeded") pair = stat;
+    });
+    if (!inbound) return;
+    const now = {
+      emitted: inbound.jitterBufferEmittedCount || 0, jitter: inbound.jitterBufferDelay || 0,
+      decoded: inbound.framesDecoded || 0, decode: inbound.totalDecodeTime || 0,
+      processing: inbound.totalProcessingDelay || 0,
+      dropped: inbound.framesDropped || 0, freezes: inbound.freezeCount || 0,
+    };
+    const before = lastStats;
+    lastStats = now;
+    if (!before) return; // the first reading only sets the starting totals
+    const emitted = now.emitted - before.emitted;
+    const decoded = now.decoded - before.decoded;
+    const message = {
+      type: "stats",
+      rttMs: pair && pair.currentRoundTripTime != null ? round(pair.currentRoundTripTime * 1000) : null,
+      jitterMs: emitted > 0 ? round((now.jitter - before.jitter) / emitted * 1000) : null,
+      decodeMs: decoded > 0 ? round((now.decode - before.decode) / decoded * 1000) : null,
+      processingMs: decoded > 0 && now.processing > 0 ? round((now.processing - before.processing) / decoded * 1000) : null,
+      displayMs: round(average(frameTimes)),
+      frameProcessingMs: round(average(frameProcessing)),
+      fps: inbound.framesPerSecond != null ? round(inbound.framesPerSecond) : null,
+      dropped: now.dropped - before.dropped,
+      freezes: now.freezes - before.freezes,
+      width: inbound.frameWidth || null,
+      height: inbound.frameHeight || null,
+    };
+    frameTimes = [];
+    frameProcessing = [];
+    try { context.sendCustomMessage(NAMESPACE, sender, message); } catch (_) {}
+  }
+  setInterval(() => { sendStats().catch(() => {}); }, 2000);
 
   const context = cast.framework.CastReceiverContext.getInstance();
   context.addCustomMessageListener(NAMESPACE, event => {
